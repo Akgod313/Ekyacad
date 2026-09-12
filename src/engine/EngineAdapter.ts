@@ -5,7 +5,8 @@ import { useCircuitStore } from '../store/useCircuitStore';
 const uiToEnginePin: Record<string, Record<string, string>> = {
   'Battery': { 'pos': '+', 'neg': '-', '+': '+', '-': '-' },
   'Resistor': { 'p1': '1', 'p2': '2', '1': '1', '2': '2' },
-  'Arduino': { '5V': '5V', 'GND': 'GND', 'D13': 'D13' } 
+  'Arduino': { '5V': '+', 'GND': '-', 'D13': 'D13' },
+  'LED': { 'anode': '1', 'cathode': '2', '1': '1', '2': '2', 'pin1': '1', 'pin2': '2' } // Catch-all for LED pins
 };
 
 export class EngineAdapter {
@@ -37,14 +38,27 @@ export class EngineAdapter {
       });
 
       const params: any = {};
-      if (comp.type === 'Resistor') params.resistance = 1000;
-      if (comp.type === 'Battery') params.voltage = 9;
+      let engineType = String(comp.type || 'unknown').toLowerCase();
+
+      if (comp.type === 'Resistor') {
+        params.resistance = comp.params?.resistance || 1000;
+      }
+      if (comp.type === 'Battery') {
+        params.voltage = comp.params?.voltage || 9;
+      }
+      if (comp.type === 'Arduino') {
+        engineType = 'battery'; 
+        params.voltage = 5;     
+      }
+      if (comp.type === 'LED') {
+        engineType = 'resistor'; // Trick SPICE so current flows through it
+        params.resistance = 10;  // Tiny resistance so it doesn't block power
+      }
 
       this.virtualScene.parts.set(comp.id, {
         userData: {
           id: comp.id,
-          // Safely cast to string, fallback to empty string if undefined to prevent crashes
-          type: String(comp.type || 'unknown').toLowerCase(), 
+          type: engineType, 
           params,
           terminals,
           visual: {} 

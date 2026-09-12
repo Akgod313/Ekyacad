@@ -18,24 +18,34 @@ export const AutoFritzingNode = ({ data, id }: any) => {
           svgElement.style.width = '100%';
           svgElement.style.height = 'auto';
 
-          // Look for any element with 'connector' or 'pin' in its ID
           const pinElements = svgElement.querySelectorAll('[id*="connector"], [id*="pin"]');
           const foundPins: { id: string; x: number; y: number }[] = [];
+          
+          // NEW: Keep track of pins we have already drawn to prevent duplicates
+          const seenConnectors = new Set<string>();
 
           pinElements.forEach((el) => {
-            const rect = el.getBoundingClientRect();
-            const containerRect = containerRef.current!.getBoundingClientRect();
-            
-            if (containerRect.width > 0) {
-              foundPins.push({
-                id: el.id || `pin_${Math.random()}`,
-                x: ((rect.left - containerRect.left + rect.width / 2) / containerRect.width) * 100,
-                y: ((rect.top - containerRect.top + rect.height / 2) / containerRect.height) * 100,
-              });
+            // Extract the base name (e.g., grab "connector1" from "connector1terminal")
+            const match = el.id.match(/(connector\d+)/i);
+            const baseId = match ? match[1] : el.id;
+
+            // If we haven't seen this connector yet, add it
+            if (!seenConnectors.has(baseId)) {
+              seenConnectors.add(baseId);
+
+              const rect = el.getBoundingClientRect();
+              const containerRect = containerRef.current!.getBoundingClientRect();
+              
+              if (containerRect.width > 0) {
+                foundPins.push({
+                  id: baseId,
+                  x: ((rect.left - containerRect.left + rect.width / 2) / containerRect.width) * 100,
+                  y: ((rect.top - containerRect.top + rect.height / 2) / containerRect.height) * 100,
+                });
+              }
             }
           });
 
-          console.log(`Found ${foundPins.length} pins for ${data.svgPath}`, foundPins);
           setPins(foundPins);
         }
       });
@@ -50,7 +60,7 @@ export const AutoFritzingNode = ({ data, id }: any) => {
     }}>
       <div ref={containerRef} style={{ pointerEvents: 'none', display: 'flex', justifyContent: 'center' }} />
       
-      {/* Render detected Fritzing pins */}
+      {/* Render detected Fritzing pins - JUST ONE HANDLE PER PIN NOW */}
       {pins.map((pin, index) => {
         const handleStyle = {
           position: 'absolute' as const,
@@ -65,20 +75,21 @@ export const AutoFritzingNode = ({ data, id }: any) => {
         };
 
         return (
-          <React.Fragment key={`${pin.id}-${index}`}>
-            <Handle type="target" position={Position.Left} id={`${pin.id}-t`} style={handleStyle} />
-            <Handle type="source" position={Position.Left} id={`${pin.id}-s`} style={handleStyle} />
-          </React.Fragment>
+          <Handle 
+            key={`${pin.id}-${index}`} 
+            type="source" 
+            position={Position.Left} 
+            id={pin.id} 
+            style={handleStyle} 
+          />
         );
       })}
 
-      {/* FALLBACK: If the SVG has no readable IDs, put handles on the left and right edges so you can still wire it */}
+      {/* FALLBACK: Cleaned up to single handles as well */}
       {pins.length === 0 && (
         <>
-          <Handle type="target" position={Position.Left} id="fallback-left-t" style={{ left: 0, top: '50%', background: 'lime', width: '10px', height: '10px' }} />
-          <Handle type="source" position={Position.Left} id="fallback-left-s" style={{ left: 0, top: '50%', background: 'lime', width: '10px', height: '10px' }} />
-          <Handle type="target" position={Position.Right} id="fallback-right-t" style={{ right: 0, top: '50%', background: 'lime', width: '10px', height: '10px' }} />
-          <Handle type="source" position={Position.Right} id="fallback-right-s" style={{ right: 0, top: '50%', background: 'lime', width: '10px', height: '10px' }} />
+          <Handle type="source" position={Position.Left} id="fallback-left" style={{ left: 0, top: '50%', background: 'lime', width: '10px', height: '10px', border: '2px solid black' }} />
+          <Handle type="source" position={Position.Right} id="fallback-right" style={{ right: 0, top: '50%', background: 'lime', width: '10px', height: '10px', border: '2px solid black' }} />
         </>
       )}
     </div>
